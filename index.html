@@ -1,0 +1,42 @@
+const http = require('http');
+const https = require('https');
+
+// Define the port and the target destination
+const PORT = 3000;
+const TARGET_HOST = 'fiveplay.lol';
+
+const server = http.createServer((clientRequest, clientResponse) => {
+    // Configure the request options for the target server
+    const options = {
+        hostname: TARGET_HOST,
+        port: 443,
+        path: clientRequest.url,
+        method: clientRequest.method,
+        headers: {
+            ...clientRequest.headers,
+            host: TARGET_HOST // Override the host header to match the target
+        }
+    };
+
+    // Forward the request to the target server
+    const targetRequest = https.request(options, (targetResponse) => {
+        // Pass the target's status code and headers back to the client
+        clientResponse.writeHead(targetResponse.statusCode, targetResponse.headers);
+        
+        // Stream the target response body back to the client
+        targetResponse.pipe(clientResponse);
+    });
+
+    // Handle connection errors
+    targetRequest.on('error', (err) => {
+        clientResponse.writeHead(500, { 'Content-Type': 'text/plain' });
+        clientResponse.end('Proxy Error: ' + err.message);
+    });
+
+    // Stream the client's request data (like POST data) to the target
+    clientRequest.pipe(targetRequest);
+});
+
+server.listen(PORT, () => {
+    console.log(`Server running at http://localhost:${PORT}`);
+});
